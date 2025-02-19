@@ -49,7 +49,7 @@ class DOMjudge:
         organizations = self.API("/organizations")
         self.organizations = {}
         for organization in organizations:
-            self.organizations[organization['icpc_id']] = organization
+            self.organizations[organization['id']] = organization
 
     def load_teams(self):
         teams = self.API("/teams")
@@ -64,7 +64,7 @@ class DOMjudge:
     def load_submissions(self):
         submissions = self.API('/submissions')
         team_ids = [team['id'] for team in self.teams]
-        func = lambda submission: submission['team_id'] in team_ids
+        func = lambda submission: submission['team_id'] in team_ids and dtime2timestamp(submission['time']) <= dtime2timestamp(self.contest_info['end_time'])
         self.submissions = list(filter(func, submissions))
 
     def load_judgements(self):
@@ -105,11 +105,20 @@ class DOMjudge:
                 max_submission_id = max(max_submission_id, int(submission['id']))
             row['score']['max_submission_id'] = max_submission_id
         self.scoreboard['rows'].sort(key = lambda x: (-x['score']['num_solved'], x['score']['total_time'], x['score']['max_submission_id']))
+
         self.scoreboard['rows'][0]['rank'] = 1
         for idx in range(len(self.scoreboard['rows']) - 1):
             self.scoreboard['rows'][idx + 1]['rank'] = idx + 2
             if self.scoreboard['rows'][idx]['score'] == self.scoreboard['rows'][idx + 1]['score']:
                 self.scoreboard['rows'][idx + 1]['rank'] = self.scoreboard['rows'][idx]['rank']
+
+        award_func = lambda row: self.team_award_occupy(row['team_id'])
+        teams = list(filter(award_func, self.scoreboard['rows']))
+        teams[0]['real_rank'] = 1
+        for idx in range(len(teams) - 1):
+            teams[idx + 1]['real_rank'] = idx + 2
+            if teams[idx]['score'] == teams[idx + 1]['score']:
+                teams[idx + 1]['real_rank'] = teams[idx]['real_rank']
     
     def export(self, filename):
         self.export_XML(filename + '.xml')
@@ -212,13 +221,23 @@ class DOMjudge:
             team = self.team_dict[team_id]
             category = team["affiliation"]
             group = self.get_team_group_name(team_id)
-            members = team["members"]
+            members = team.get("members", "")
             self.award_list.append(f'"{team_id}","{team["name"]}","{group}","{category}","{citation}","{members}"')
         return {
             'id': id,
             'citation': citation,
             'show': 'true',
             'teamId': team_ids
+        }
+
+
+    def award_as_list(self, id, citation, team_ids):
+        return {
+            'id': id,
+            'citation': citation,
+            'show': 'true',
+            'teamId': team_ids,
+            'displayMode': 'list'
         }
 
     def get_team_categories_id(self, team_id):
@@ -258,30 +277,26 @@ class DOMjudge:
             first_solved_award.append(self.award('first-to-solve-%c' % chr(65 + idx), 'First to solve problem %c' % chr(65 + idx), submission['team_id']))
         return first_solved_award
 
-    def resolver_award_top_team_formatter(self, rank):  #WARNING: 排名相同无法一起评
-        buf = [[] for _ in range(rank + 1)]
-        cnt = 0
+    def resolver_award_top_team_formatter(self, rank):
+        buf = [[] for _ in range(rank)]
         for row in self.scoreboard['rows']:
-            if cnt == rank:
-                break
             if not self.team_award_occupy(row['team_id']): #打星队伍不评奖
                 continue
-            cnt += 1
-            buf[cnt].append(row['team_id'])
+            if row['real_rank'] > rank:
+                break
+            buf[row['real_rank'] - 1].append(row['team_id'])
         top_team_award = []
-        for idx, team_ids in enumerate(buf):
+        for idx, team_ids in enumerate(buf, start=1):
             top_team_award.append(self.award(f'rank-{idx}', '%s Place' % make_ordinal(idx), team_ids))
         return top_team_award
 
-    def resolver_award_winner_formatter(self):  #WARNING: 排名相同无法一起评
+    def resolver_award_winner_formatter(self): 
         rank = 1
-        buf = [[] for _ in range(rank + 1)]
-        cnt = 0
+        buf = [[] for _ in range(rank)]
         for row in self.scoreboard['rows']:
-            if cnt == rank:
+            if row['rank'] > rank:
                 break
-            cnt += 1
-            buf[cnt].append(row['team_id'])
+            buf[row['rank'] - 1].append(row['team_id'])
         winner_award = []
         for _, team_ids in enumerate(buf):
             winner_award.append(self.award(f'winner', 'World Champion', team_ids))
@@ -293,8 +308,6 @@ class DOMjudge:
             if self.team_in_group(row['team_id'], self.config['award_best_girl']):
                 best_girls_team_id = row['team_id']
                 break
-            if row['rank'] > self.limited: # 限定最佳女队必得奖牌
-                break
         best_girls_award = []    
         if best_girls_team_id != -1:
             best_girls_award.append(self.award(f"group-winner-{self.config['award_best_girl'][0]}", "The Best Girls's Team", best_girls_team_id))
@@ -302,48 +315,44 @@ class DOMjudge:
 
     def resolver_award_medal_formatter(self):
         medal_team_award = []
-        # award for gold
-        totle = self.config['gold']
-        buf = []
+        button_rank = 0
+        medals = [
+            (self.config['gold'], "gold-medal", "Gold Medalist", True, self.config['gold_show_list']),
+            (self.config['silver'], "silver-medal", "Silver Medalist", True, self.config['silver_show_list']),
+            (self.config['bronze'], "bronze-medal", "Bronze Medalist", True, self.config['bronze_show_list']),
+            (99999999, "honors-metion", "Honorable mention", False, self.config['honors_show_list'])
+        ]
         pos = 0
-        if totle > 0:
-            while totle > 0:
+        pos_up = len(self.scoreboard['rows'])
+        star_buf = []
+        for total, id, citation, give_medal, show_as_list in medals:
+            button_rank += total
+            buf = []
+            while pos < pos_up:
                 row = self.scoreboard['rows'][pos]
-                if not self.team_award_occupy(row['team_id']): #打星队伍不占用获奖名额
-                    totle += 1
+                if not self.team_award_occupy(row['team_id']):
+                    star_buf.append(row['team_id'])
+                    pos += 1
+                    continue
+                if row['real_rank'] > button_rank:
+                    break
                 buf.append(row['team_id'])
-                totle -= 1
                 pos += 1
-            medal_team_award.append(self.award("gold-medal", "Gold Medalist", buf))
-        # award for silver
-        totle = self.config['silver']
-        buf = []
-        if totle > 0:
-            while totle > 0:
-                row = self.scoreboard['rows'][pos]
-                if not self.team_award_occupy(row['team_id']): #打星队伍不占用获奖名额
-                    totle += 1
-                buf.append(row['team_id'])
-                totle -= 1
-                pos += 1
-            medal_team_award.append(self.award("silver-medal", "Silver Medalist", buf))
-        # award for bronze
-        totle = self.config['bronze']
-        buf = []
-        if totle > 0:
-            while totle > 0:
-                row = self.scoreboard['rows'][pos]
-                if not self.team_award_occupy(row['team_id']): #打星队伍不占用获奖名额
-                    totle += 1
-                buf.append(row['team_id'])
-                totle -= 1
-                pos += 1
-            medal_team_award.append(self.award("bronze-medal", "Bronze Medalist", buf))
-        self.limited = pos - 1
+
+            if give_medal and buf:
+                medal_team_award.append(self.award(id, citation, buf))
+            if show_as_list and buf:
+                medal_team_award.append(self.award(id, citation, buf))
+            if len(buf) != total:
+                print(f"Warning: {citation} expected {total} teams, but got {len(buf)}")
+
+        if star_buf:
+            medal_team_award.append(self.award("Honors-metion", "Star Team", star_buf))
         return medal_team_award
 
     def resolver_award_last_AC_formatter(self):
-        submissions = list(filter(lambda submission: submission['judgement_type']['id'] == "AC", self.submissions))
+        submissions = list(filter(lambda submission: submission['judgement_type']['id'] == "AC" and 
+                                  self.team_award_occupy(submission['team_id']), self.submissions))
         if len(submissions) == 0:
             return []
         return [
@@ -351,7 +360,8 @@ class DOMjudge:
         ]
 
     def resolver_award_first_WA(self):
-        submissions = list(filter(lambda submission: submission['judgement_type']['id'] == "WA", self.submissions))
+        submissions = list(filter(lambda submission: submission['judgement_type']['id'] == "WA" and
+                                  self.team_award_occupy(submission['team_id']), self.submissions))
         if len(submissions) == 0:
             return []
         return [
