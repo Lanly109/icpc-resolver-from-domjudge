@@ -11,7 +11,7 @@ def main():
     argument = argument_parser()
     config = config_loader(argument['config'])
     # PTA_school(config).export(config['xml'])
-    DOMjudge(config).export(config['xml'])
+    DOMjudge(config).export(config['json'])
 
 if __name__ == '__main__':
     main()

@@ -1,5 +1,6 @@
 import json
 import requests
+import datetime
 from html import escape
 from functools import reduce
 
@@ -25,17 +26,32 @@ class DOMjudge:
 
     def load_data(self):
         self.load_contest_info()
+        self.load_state_info()
         self.load_groups()
+        self.load_languages()
         self.load_organizations()
         self.load_teams()
         self.load_submissions()
         self.load_judgements()
         self.load_judgement_types()
+        self.load_runs()
         self.load_problems()
         self.load_scoreboard()
 
     def load_contest_info(self):
         self.contest_info = self.API("/")
+
+    def load_state_info(self):
+        self.state_info = self.API("/state")
+        for key in ['thawed', 'finalized', 'end_of_updates']:
+            if self.state_info[key] == None:
+                self.state_info[key] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+
+    def load_languages(self):
+        self.languages = self.API("/languages")
+
+    def load_runs(self):
+        self.runs = self.API("/runs")
 
     def load_groups(self):
         groups = self.API("/groups")
@@ -121,8 +137,13 @@ class DOMjudge:
                 teams[idx + 1]['real_rank'] = teams[idx]['real_rank']
     
     def export(self, filename):
-        self.export_XML(filename + '.xml')
+        # self.export_XML(filename + '.xml')
+        self.export_json(filename + '.json')
         self.export_result(filename + '.csv')
+
+    def export_json(self, filename):
+        with open(filename, 'w', encoding="utf-8") as f:
+           f.write('\n'.join(self.resolver_json_formatter()))
 
     def export_XML(self, filename):
         with open(filename, 'w', encoding="utf-8") as f:
@@ -131,6 +152,39 @@ class DOMjudge:
     def export_result(self, filename):
         with open(filename, 'w', encoding="utf-8") as f:
            f.write('\n'.join(self.award_list))
+
+    def format_json(self, type, id, data):
+        return json.dumps({
+            'type': type,
+            'id': id,
+            'data': data
+        })
+
+    def resolver_json_formatter(self):
+        ret = []
+        ret.append(self.format_json('contest', self.contest_info['id'], self.contest_info))
+        for judgement_type in self.judgement_types:
+            ret.append(self.format_json('judgement-types', judgement_type['id'], judgement_type))
+        for group in self.groups.values():
+            ret.append(self.format_json('groups', group['id'], group))
+        for languages in self.languages:
+            ret.append(self.format_json('languages', languages['id'], languages))
+        for organization in self.organizations.values():
+            ret.append(self.format_json('organizations', organization['id'], organization))
+        for team in self.teams:
+            ret.append(self.format_json('teams', team['id'], team))
+        for problem in self.problems:
+            ret.append(self.format_json('problems', problem['id'], problem))
+        for submission in self.submissions:
+            ret.append(self.format_json('submissions', submission['id'], submission))
+        for judgement in self.judgements:
+            ret.append(self.format_json('judgements', judgement['id'], judgement))
+        for run in self.runs:
+            ret.append(self.format_json('runs', run['id'], run))
+        for award in self.resolver_award_formatter():
+            ret.append(self.format_json('awards', award['id'], award))
+        ret.append(self.format_json('state', None, self.state_info))
+        return ret
 
     def resolver_formatter(self):
         return { 'contest': self.resolver_contest_formatter() }
@@ -144,7 +198,7 @@ class DOMjudge:
             'judgement': self.resolver_judgement_formatter(),
             'run': self.resolver_run_formatter(),
             'award': self.resolver_award_formatter(),
-            'finalized': self.resolver_finalized_formatter()
+            # 'finalized': self.resolver_finalized_formatter()
         }
 
     def resolver_group_formatter(self):
@@ -227,7 +281,7 @@ class DOMjudge:
             'id': id,
             'citation': citation,
             'show': 'true',
-            'teamId': team_ids
+            'team_ids': teams
         }
 
 
@@ -236,8 +290,8 @@ class DOMjudge:
             'id': id,
             'citation': citation,
             'show': 'true',
-            'teamId': team_ids,
-            'displayMode': 'list'
+            'team_ids': team_ids,
+            'display_mode': 'list'
         }
 
     def get_team_categories_id(self, team_id):
@@ -270,11 +324,12 @@ class DOMjudge:
                 continue
             if ctime2timestamp(submission['contest_time']) >= ctime2timestamp(self.contest_info['duration']) - ctime2timestamp(self.contest_info['scoreboard_freeze_duration']):
                 continue
-            idx = problem_id2idx[submission['problem_id']]
+            pid = submission['problem_id']
+            idx = problem_id2idx[pid]
             if first_solved[idx]:
                 continue
             first_solved[idx] = True
-            first_solved_award.append(self.award('first-to-solve-%c' % chr(65 + idx), 'First to solve problem %c' % chr(65 + idx), submission['team_id']))
+            first_solved_award.append(self.award('first-to-solve-%s' % str(pid), 'First to solve problem %c' % chr(65 + idx), submission['team_id']))
         return first_solved_award
 
     def resolver_award_top_team_formatter(self, rank):
@@ -317,21 +372,22 @@ class DOMjudge:
         medal_team_award = []
         button_rank = 0
         medals = [
-            (self.config['gold'], "gold-medal", "Gold Medalist", True, self.config['gold_show_list']),
-            (self.config['silver'], "silver-medal", "Silver Medalist", True, self.config['silver_show_list']),
-            (self.config['bronze'], "bronze-medal", "Bronze Medalist", True, self.config['bronze_show_list']),
-            (99999999, "honors-metion", "Honorable mention", False, self.config['honors_show_list'])
+            (self.config['gold'], "gold-medal", "Gold medal winner", True, "Gold Winner", self.config['gold_show_list']),
+            (self.config['silver'], "silver-medal", "Silver medal winner", True, "Silver Winner", self.config['silver_show_list']),
+            (self.config['bronze'], "bronze-medal", "Bronze medal winner", True, "Bronze Winner", self.config['bronze_show_list']),
+            (99999999, "honors-metion", "Honorable mention", False, "Honorable Mention", self.config['honors_show_list'])
         ]
         pos = 0
         pos_up = len(self.scoreboard['rows'])
         star_buf = []
-        for total, id, citation, give_medal, show_as_list in medals:
+        for total, id, citation, give_medal, list_citation, show_as_list in medals:
             button_rank += total
             buf = []
             while pos < pos_up:
                 row = self.scoreboard['rows'][pos]
                 if not self.team_award_occupy(row['team_id']):
-                    star_buf.append(row['team_id'])
+                    if give_medal:
+                        star_buf.append(row['team_id'])
                     pos += 1
                     continue
                 if row['real_rank'] > button_rank:
@@ -342,7 +398,7 @@ class DOMjudge:
             if give_medal and buf:
                 medal_team_award.append(self.award(id, citation, buf))
             if show_as_list and buf:
-                medal_team_award.append(self.award(id, citation, buf))
+                medal_team_award.append(self.award_as_list(id + "_list", list_citation, buf))
             if len(buf) != total:
                 print(f"Warning: {citation} expected {total} teams, but got {len(buf)}")
 

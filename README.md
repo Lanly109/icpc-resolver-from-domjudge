@@ -17,11 +17,17 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 
 其中打星队伍会颁发金银铜，但不会占用总获奖名额。
 
-在生成`xml`的同时还会生成对应名字的`csv`，包含队伍的信息和奖项，方便制作获奖队伍PPT。
+在生成`json`的同时还会生成对应名字的`csv`，包含队伍的信息和奖项，方便制作获奖队伍PPT。
 
 `resolver`源码阅读记录：[滚榜程序Resolver源码阅读](https://blog.lanly.vip/article/7)
 
 ## 更新log
+
+### 2025.02.20
+
+更新适应domjudge >= 8.2。
+
+7.0的请参考`domjudge7`分支。
 
 ### 2023.05.14
 
@@ -67,9 +73,7 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 
 ## Prerequisite
 
-* icpc-resolver >= resolver-2.1
-* domjudge-domserver >= 7.0.1
-* python >= 3.6.8
+推荐 [icpc-resolver 2.5.940](https://github.com/icpctools/icpctools/releases/download/v2.5.940/resolver-2.5.940.zip)
 
 ## Usage
 1. setup config.json
@@ -92,9 +96,7 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 
 - `no_occupy_award_categories`表示给予颁奖，但不占用名额，是想让那些打星选手也亮亮相，而不是没有任何奖项在滚榜时匆匆略过。
 
-- 默认打星选手不参与一血奖，如需参与则注释225,226行即可。
-
-- 默认最佳女队奖必须获得牌，如无该条件则注释271,272行即可。
+- 打星选手不参与一血奖。
 
 #### example
 ```jsonld
@@ -113,7 +115,7 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 python3 main.py
 ```
 
-将生成的`events.xml`文件放入[CDP](https://clics.ecs.baylor.edu/index.php/CDP)格式的目录下，运行`Resolver`。
+将生成的`event-feed.json`文件放入[CDP](https://clics.ecs.baylor.edu/index.php/CDP)格式的目录下，运行`Resolver`。
 
 ```bash
 ./resolver.sh /path/to/cdp
@@ -122,37 +124,19 @@ python3 main.py
 
 #### tip
 
-Resolver 2.4版的`CDP`目录格式如下：
+Resolver 2.5版的`CDP`目录格式如下：
 
 ```bash
 .
-├── config              // 非必需
-│   ├── contest.yaml    // 从domjudge Import/export页面导出即可
-│   ├── groups.tsv      // 从domjudge Import/export页面导出即可
-│   ├── problemset.yaml
-│   └── teams.tsv       // 从domjudge Import/export页面导出即可
 ├── contest
-│   ├── banner.png      // resolver无用，但在cds放置于此就可显示banner
 │   └── logo.png        // resolver主页面的图片&无照片队伍的默认照片
-├── events.xml          // 上述python工具生成的xml
-├── groups              // Categories照片，但resolver似乎无用
-│   └── 3               // Categories的id
-│       └── logo.png
+├── event-feed.json     // 上述python工具生成的json
 ├── organizations       // Affiliations照片，只要某Affiliations的队伍有logo，其他同Affiliations的队伍就都是该logo
-│   ├── 3000            // 该Affiliations所对应的任一队伍的id
+│   ├── 2              // Affiliations的id
 │   │   └── logo.png
-│   ├── 3001
-│   │   └── logo.png
-│   ├── 3012
-│   │   └── logo.png
-│   ├── 3017
-│   │   ├── country_flag.png    // 源码里这样放置的，但resolver似乎无用
-│   │   └── logo.png
-│   └── 3187
-│       └── logo.png
 └── teams               // 队伍照片
     ├── 3000            // 队伍的id
-    │   └── photo.png   // 照片名字
+    │   └── photo.png   
     ├── 3001
     │   └── photo.png
     ├── 3009
@@ -160,50 +144,3 @@ Resolver 2.4版的`CDP`目录格式如下：
     └── 3010
         └── photo.png
 ``` 
-
-其中`problemset.yaml`格式如下：
-
-```yaml
-problems:
-  - letter:     A
-    short-name: A
-    color:      yellow
-    rgb:        '#ffff00'
-  
-  - letter:     B
-    short-name: B
-    color:      red
-    rgb:        '#ff0000'
-  
-  - letter:     C
-    short-name: C
-    color:      green
-    rgb:        '#00ff00'
-``` 
-
-该文件非必需，需有该文件，请务必确保其`short-name`为题号，`resolver`的一血奖与该`short-name`对应。
-
-
----
-
-Resolver 2.1版本的CDP格式如下：
-
-```bash
-.
-├── config          // 非必需
-│   ├── contest.yaml
-│   ├── groups.tsv
-│   ├── problemset.yaml
-│   └── teams.tsv
-├── events.xml      // 由上述python脚本生成的数据，其与2.4版少了个<penalty>属性
-└── images
-    ├── logo        // Affiliations的logo，数字为属于该Affiliations的任意队伍的icpc id
-    │   └── 3001.png
-    └── team        // 队伍照片
-        ├── 3001.jpg    // 数字为队伍的icpc id
-        ├── 3002.jpg
-        ├── 3003.jpg
-        ├── 3004.jpg
-        └── 3005.jpg
-``` 
-

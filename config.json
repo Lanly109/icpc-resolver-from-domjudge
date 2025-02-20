@@ -1,0 +1,20 @@
+{
+    "url": "http://example.domjudge.com/api/v4/contests/1",
+    "username": "username",
+    "password": "password",
+    "xml": "events",
+    "json": "event-feed",
+    "gold": 16,
+    "silver": 32,
+    "bronze": 47,
+    "gold_show_list": false,
+    "silver_show_list": true,
+    "bronze_show_list": true,
+    "honors_show_list": true,
+    "no_occupy_award_categories": [
+        "2"
+    ],
+    "award_best_girl": [
+        "11"
+    ]
+}
