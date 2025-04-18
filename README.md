@@ -19,15 +19,103 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 
 在生成`json`的同时还会生成对应名字的`csv`，包含队伍的信息和奖项，方便制作获奖队伍PPT。
 
-`resolver`源码阅读记录：[滚榜程序Resolver源码阅读](https://blog.lanly.vip/article/7)
+`resolver`源码阅读记录：[滚榜程序Resolver源码阅读](https://lanly109.github.io/posts/7b2538bb.html)
+
+## Prerequisite
+
+推荐 [icpc-resolver 2.5.940](https://github.com/icpctools/icpctools/releases/download/v2.5.940/resolver-2.5.940.zip)
+
+## Usage
+1. setup config.json
+### config.json
+```jsonld
+{
+  "url": <contest api url>,
+  "username": <username whose role is api_reader>,
+  "password": <password of the user>,
+  "xml": <output xml file name>,
+  "json": <output xml file name>,,
+  "gold": <the number of gold medals>,
+  "silver": <the number of silver medals>,
+  "bronze": <the number of bronze medals>,
+  "gold_show_list": true/false,
+  "silver_show_list": true/false,
+  "bronze_show_list": true/false,
+  "honors_show_list": true/false,
+  "no_occupy_award_categories": [<group_id1>, <group_id2>, ...],
+  "award_best_girl": [<group_id1>]
+}
+```
+
+- 登录的`user`需为`api_reader`角色。
+
+- `no_occupy_award_categories`表示给位于牌区的打星队也能够展示图片（赋予`Star Team`的奖项）。
+
+- 打星选手不参与一血奖。
+
+#### example
+```jsonld
+  "url": "https://www.example.com/api/v4/contests/{cid},
+  "username": "cds",
+  "password": "cds",
+  "xml": "events.xml"
+  "json": "event-feed",
+  "gold": 16,
+  "silver": 32,
+  "bronze": 47,
+  "gold_show_list": false,
+  "silver_show_list": true,
+  "bronze_show_list": true,
+  "honors_show_list": true,
+  "no_occupy_award_categories": ["18", "20"],
+  "award_best_girl": ["11"]
+```
+2. run main.py
+```
+python3 main.py
+```
+
+将生成的`event-feed.json`文件放入[CDP](https://clics.ecs.baylor.edu/index.php/CDP)格式的目录下，运行`Resolver`。
+
+```bash
+./resolver.sh /path/to/cdp
+``` 
+
+#### tip
+
+Resolver 2.5版的`CDP`目录格式如下：
+
+```bash
+.
+├── contest
+│   └── logo.png        // resolver主页面的图片&无照片队伍的默认照片
+├── event-feed.json     // 上述python工具生成的json
+├── organizations       // Affiliations照片，只要某Affiliations的队伍有logo，其他同Affiliations的队伍就都是该logo
+│   ├── 2              // Affiliations的id
+│   │   └── logo.png
+└── teams               // 队伍照片
+    ├── 3000            // 队伍的id
+    │   └── photo.png   
+    ├── 3001
+    │   └── photo.png
+    ├── 3009
+    │   └── photo.png
+    └── 3010
+        └── photo.png
+``` 
 
 ## 更新log
 
-### 2025.02.20
+### 2025.04.18
 
-更新适应domjudge >= 8.2。
+更新适应domjudge >= 8.2。`PTA`版本未测试！
 
 7.0的请参考`domjudge7`分支。
+
+提供一个`CDP`格式的`demo`文件夹，`resolver`的运行指令：
+```bash
+./resolver.sh ./demo
+```
 
 ### 2023.05.14
 
@@ -70,77 +158,3 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 ### 2022.10.06
 
 不用再获取`Basic Authorization key`，改为用账号登录的方式
-
-## Prerequisite
-
-推荐 [icpc-resolver 2.5.940](https://github.com/icpctools/icpctools/releases/download/v2.5.940/resolver-2.5.940.zip)
-
-## Usage
-1. setup config.json
-### config.json
-```jsonld
-{
-  "url": <contest api url>,
-  "username": <username whose role is api_reader>,
-  "password": <password of the user>,
-  "xml": <output xml file name>,
-  "gold": <the number of gold medals>,
-  "silver": <the number of silver medals>,
-  "bronze": <the number of bronze medals>,
-  "no_occupy_award_categories": [<group_id1>, <group_id2>, ...],
-  "award_best_girl": [<group_id1>]
-}
-```
-
-- 登录的`user`需为`api_reader`角色。
-
-- `no_occupy_award_categories`表示给予颁奖，但不占用名额，是想让那些打星选手也亮亮相，而不是没有任何奖项在滚榜时匆匆略过。
-
-- 打星选手不参与一血奖。
-
-#### example
-```jsonld
-  "url": "https://www.example.com/api/v4/contests/{cid},
-  "username": "cds",
-  "password": "cds",
-  "xml": "events.xml"
-  "gold": 4,
-  "silver": 4,
-  "bronze": 4,
-  "no_occupy_award_categories": ["18", "20"],
-  "award_best_girl": ["11"]
-```
-2. run main.py
-```
-python3 main.py
-```
-
-将生成的`event-feed.json`文件放入[CDP](https://clics.ecs.baylor.edu/index.php/CDP)格式的目录下，运行`Resolver`。
-
-```bash
-./resolver.sh /path/to/cdp
-``` 
-
-
-#### tip
-
-Resolver 2.5版的`CDP`目录格式如下：
-
-```bash
-.
-├── contest
-│   └── logo.png        // resolver主页面的图片&无照片队伍的默认照片
-├── event-feed.json     // 上述python工具生成的json
-├── organizations       // Affiliations照片，只要某Affiliations的队伍有logo，其他同Affiliations的队伍就都是该logo
-│   ├── 2              // Affiliations的id
-│   │   └── logo.png
-└── teams               // 队伍照片
-    ├── 3000            // 队伍的id
-    │   └── photo.png   
-    ├── 3001
-    │   └── photo.png
-    ├── 3009
-    │   └── photo.png
-    └── 3010
-        └── photo.png
-``` 
