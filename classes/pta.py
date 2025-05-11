@@ -1,4 +1,5 @@
 import json
+import datetime
 import requests
 from html import escape
 from functools import reduce
@@ -21,6 +22,7 @@ class PTA_school:
         self.raw_organizations = []
         self.raw_submissions = []
         self.raw_judgements = []
+        self.raw_languages = []
         self.load_data()
         self.prep_data()
 
@@ -36,6 +38,7 @@ class PTA_school:
     def load_data(self):
         self.load_event_feed()
         self.load_groups()
+        self.load_languages()
         self.load_organizations()
         self.load_teams()
         self.load_submissions()
@@ -45,6 +48,7 @@ class PTA_school:
         self.load_scoreboard()
 
     def load_event_feed(self):
+        tz = datetime.timezone(datetime.timedelta(hours=8))
         if self.config["file"] != "":
             with open(self.config['file'], "r") as f:
                 res = f.read()
@@ -55,13 +59,17 @@ class PTA_school:
             info_type = info["type"]
             info_data = info["data"]
             if info_type == "state":
-                pass
+                self.state_info = info_data
+                for key in ['end_of_updates', 'finalized']:
+                # for key in ['thawed', 'finalized', 'end_of_updates']:
+                    if self.state_info.get(key, None) == None:
+                        self.state_info[key] = datetime.datetime.now(tz).isoformat(timespec='seconds')
             elif info_type == "contests":
                 self.contest_info = info_data
             elif info_type == "judgement-types":
                 self.raw_judgement_types.append(info_data)
             elif info_type == "languages":
-                pass
+                self.raw_languages.append(info_data)
             elif info_type == "problems":
                 self.raw_problems.append(info_data)
             elif info_type == "teams":
@@ -84,6 +92,9 @@ class PTA_school:
         # func = lambda group : not group['hidden']
         # groups = list(filter(func, groups))
         self.groups = {group['id'] : group for group in groups}
+
+    def load_languages(self):
+        self.languages = self.raw_languages
 
     def load_organizations(self):
         organizations = self.raw_organizations
@@ -186,8 +197,46 @@ class PTA_school:
                 f.write(line + '\n')
     
     def export(self, filename):
-        self.export_XML(filename + '.xml')
+        # self.export_XML(filename + '.xml')
+        self.export_json(filename + '.json')
         self.export_result(filename + '.csv')
+
+    def export_json(self, filename):
+        with open(filename, 'w', encoding="utf-8") as f:
+           f.write('\n'.join(self.resolver_json_formatter()))
+
+    def format_json(self, type, id, data):
+        return json.dumps({
+            'type': type,
+            'id': id,
+            'data': data
+        })
+
+    def resolver_json_formatter(self):
+        ret = []
+        ret.append(self.format_json('contest', self.contest_info['id'], self.contest_info))
+        for judgement_type in self.judgement_types:
+            ret.append(self.format_json('judgement-types', judgement_type['id'], judgement_type))
+        for group in self.groups.values():
+            ret.append(self.format_json('groups', group['id'], group))
+        for languages in self.languages:
+            ret.append(self.format_json('languages', languages['id'], languages))
+        for organization in self.organizations.values():
+            ret.append(self.format_json('organizations', organization['id'], organization))
+        for team in self.teams:
+            ret.append(self.format_json('teams', team['id'], team))
+        for problem in self.problems:
+            ret.append(self.format_json('problems', problem['id'], problem))
+        for submission in self.submissions:
+            ret.append(self.format_json('submissions', submission['id'], submission))
+        for judgement in self.judgements:
+            ret.append(self.format_json('judgements', judgement['id'], judgement))
+        # for run in self.runs:
+            # ret.append(self.format_json('runs', run['id'], run))
+        for award in self.resolver_award_formatter():
+            ret.append(self.format_json('awards', award['id'], award))
+        ret.append(self.format_json('state', None, self.state_info))
+        return ret
 
     def export_XML(self, filename):
         with open(filename, 'w', encoding="utf-8") as f:
@@ -209,7 +258,7 @@ class PTA_school:
             'judgement': self.resolver_judgement_formatter(),
             'run': self.resolver_run_formatter(),
             'award': self.resolver_award_formatter(),
-            'finalized': self.resolver_finalized_formatter()
+            # 'finalized': self.resolver_finalized_formatter()
         }
 
     def resolver_group_formatter(self):
@@ -294,7 +343,7 @@ class PTA_school:
             'id': id,
             'citation': citation,
             'show': 'true',
-            'teamId': team_ids
+            'team_ids': team_ids
         }
 
     def get_team_categories_id(self, team_id):

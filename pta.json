@@ -1,23 +1,28 @@
 {
-  "url": "https://pintia.cn/api/xcpc/problem-sets/<PID>/",
-  "file":"",
-  "username": "",
-  "password": "",
-  "xml": "events",
-  "ben": {
-      "group": [1],
-      "gold": 10,
-      "silver": 20,
-      "bronze": 30,
-      "first": 3,
-      "suffix": ""
-  },
-  "zhuan": {
-      "group": [2],
-      "gold": 1,
-      "silver": 2,
-      "bronze": 3,
-      "first": 3,
-      "suffix": "(专科)"
-  }
+    "url": "https://pintia.cn/api/xcpc/competitions/<PID>/",
+    "file": "",
+    "username": "",
+    "password": "",
+    "xml": "events",
+    "json": "event-feed",
+    "ben": {
+        "group": [
+            1
+        ],
+        "gold": 10,
+        "silver": 20,
+        "bronze": 30,
+        "first": 3,
+        "suffix": ""
+    },
+    "zhuan": {
+        "group": [
+            2
+        ],
+        "gold": 1,
+        "silver": 2,
+        "bronze": 3,
+        "first": 3,
+        "suffix": "(专科)"
+    }
 }

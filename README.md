@@ -23,7 +23,7 @@ A tools to generate xml file of icpc-resolver via domjudge RESTful API.
 
 ## Prerequisite
 
-推荐 [icpc-resolver 2.5.940](https://github.com/icpctools/icpctools/releases/download/v2.5.940/resolver-2.5.940.zip)
+推荐 [icpc-resolver 2.5.940](https://github.com/icpctools/icpctools/releases/download/v2.5.940/resolver-2.5.940.zip) 或 [icpc-resolver 2.5.1160](https://github.com/icpctools/icpctools/releases/download/v2.6.1160/resolver-2.6.1160.zip)
 
 ## Usage
 1. setup config.json
@@ -105,6 +105,10 @@ Resolver 2.5版的`CDP`目录格式如下：
 ``` 
 
 ## 更新log
+
+### 2025.05.11
+
+适配`PTA`版本
 
 ### 2025.04.18
 
